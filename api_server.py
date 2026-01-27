@@ -10,8 +10,8 @@ from typing import List, Optional, Dict, Any, Set
 
 from fastapi import FastAPI, HTTPException, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-from pydantic_settings import BaseSettings
+from pydantic import BaseModel, Field, ConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Check availability of ML libraries
 try:
@@ -47,12 +47,16 @@ class Settings(BaseSettings):
     
     # Search Configuration
     DEFAULT_TOP_K: int = 5
-    # Similarity score (0.0 to 1.0). Matches below this are considered "noise" and filtered out.
-    # 0.20 - 0.30 is usually a good range for this model after metadata enrichment.
     SIMILARITY_THRESHOLD: float = 0.20 
     
-    class Config:
-        env_prefix = "VA_"
+    # Configuration for environment variables and .env file
+    # Priority: 1. ENV, 2. .env file, 3. Defaults
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_prefix="VA_",
+        extra="ignore"
+    )
 
 settings = Settings()
 
