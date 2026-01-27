@@ -1,0 +1,12 @@
+langchain
+langchain-community
+langchain-openai
+sqlalchemy
+openai
+sentence-transformers
+faiss-cpu
+numpy
+fastapi
+uvicorn
+tf-keras
+ml-dtypes
