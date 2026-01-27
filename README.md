@@ -1,146 +1,110 @@
 # AI Vehicle Analytics System
 
-A production-grade Natural Language Interface for querying vehicle surveillance data using semantic search.
+A production-grade Natural Language Interface for querying vehicle surveillance data using Hybrid AI search backed by **Apache Cassandra**.
 
 ## Project Structure
 
 ```
 ai_vehicle_analytics/
-├── api_server.py              # Production FastAPI service (MAIN)
-├── setup_database.py          # Database initialization script
-├── vehicles.db                # SQLite database with vehicle sightings
-├── requirements.txt           # Python dependencies
-├── ai_analytics_engine.py     # Text-to-SQL approach (alternative)
-├── semantic_search.py         # Standalone semantic search demo
-├── APPROACHES.md              # Comparison of different AI approaches
-├── ANALYSIS_REPORT.md         # Performance analysis
-└── IMPLEMENTATION_PLAN.md     # Initial design document
+├── api_server.py                # Production FastAPI service (MAIN)
+├── semantic_search.py           # Core Hybrid AI search engine logic
+├── manage_cassandra.py          # Unified tool for Data Sync, Verification & Clearing
+├── final_comparison.py          # Side-by-side validation (CQL vs AI Search)
+├── setup_cassandra.py           # Infrastructure setup (Keyspace/Tables)
+├── .env                         # Production environment configuration
+├── .env.example                 # Config template for new environments
+├── requirements.txt             # Python dependencies
+├── ULTIMATE_CASSANDRA_VERIFICATION.md  # Final 100% precision report
+└── ai_analytics_engine.py       # Alternative Prototype (Text-to-CQL)
 ```
 
-## Quick Start
+## Setup & Installation (Local Development)
 
-### 1. Install Dependencies
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/dheepa-g/ai_vehicle_analytics.git
+   cd ai_vehicle_analytics
+   ```
+
+2. **Initialize Environment**:
+   ```bash
+   # Use the provided defaults or edit .env for custom IPs
+   cp .env.example .env
+   ```
+
+3. **Install Dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Initialize Cassandra Infrastructure**:
+   Ensure your Cassandra Docker container is running, then create the keyspace:
+   ```bash
+   python3 setup_cassandra.py
+   ```
+
+5. **Sync Sample Data**:
+   ```bash
+   python3 manage_cassandra.py sync
+   ```
+
+## Production Deployment Steps
+
+To deploy this service on a **separate server**, follow these steps:
+
+### 1. Infrastructure Setup
+Ensure the server has Python 3.10+ installed and access to a Cassandra node (Standard port 9042).
+
+### 2. Configure Environment
+Update the `.env` file on the server to point to your production details:
 ```bash
-pip install -r requirements.txt
+nano .env
 ```
+Update:
+- `VA_CASSANDRA_HOST`: IP of your Cassandra cluster.
+- `VA_DEVICE`: Set to `cuda` if GPU is available, else `cpu`.
 
-### 2. Initialize Database
-```bash
-python3 setup_database.py
-```
-
-### 3. Start the API Server
+### 3. Launch Service
+Run the API server:
 ```bash
 python3 api_server.py
 ```
 
-The server will start at `http://localhost:8000`
-
-### 4. Query the System
-
-**Using curl:**
-```bash
-curl -X POST "http://localhost:8000/search" \
-     -H "Content-Type: application/json" \
-     -d '{"query": "show me vehicle KA01JJ8967 movements yesterday"}'
-```
-
-**Using the interactive docs:**
-Open `http://localhost:8000/docs` in your browser.
-
 ## API Endpoints
 
-### POST /search
-Search for vehicle sightings using natural language.
+### POST `/search`
+The primary endpoint for natural language queries.
 
 **Request:**
 ```json
 {
-  "query": "vehicles at warehouse yesterday",
-  "top_k": 5,           // Optional: max results (default: 5)
-  "threshold": 0.30     // Optional: min similarity score (default: 0.30)
+  "query": "all vehicles at warehouse today",
+  "top_k": 10,
+  "threshold": 0.15
 }
 ```
 
-**Response:**
-```json
-{
-  "count": 3,
-  "query": "vehicles at warehouse yesterday",
-  "matches": [...],
-  "formatted_report": "...",
-  "execution_time_ms": 12.5
-}
-```
+## Search Capability
 
-### GET /health
-Check service status and indexed record count.
+The engine handles complex semantic and relative time queries:
+- *"Who entered through the main gate entrance on 27/1/2026?"*
+- *"Show me suspicious late-night activities"* (Matches 12AM-5AM)
+- *"Find any delivery trucks near the warehouse yesterday"*
 
-### POST /admin/refresh
-Reload data from database without restarting the server.
+## Verification & Accuracy
 
-## Configuration
-
-Set environment variables with `VA_` prefix:
-
+Confirm the system is operational and accurate by running the verification report:
 ```bash
-export VA_SIMILARITY_THRESHOLD=0.35
-export VA_DEFAULT_TOP_K=10
-export VA_MODEL_NAME="all-MiniLM-L6-v2"
+python3 final_comparison.py
 ```
-
-## Features
-
-- ✅ **Natural Language Queries**: Ask questions in plain English
-- ✅ **Semantic Search**: Understands meaning, not just keywords
-- ✅ **Threshold Filtering**: Automatically removes irrelevant results
-- ✅ **Production Ready**: Logging, error handling, CORS support
-- ✅ **Fast**: Responses in ~10ms after initial model load
-- ✅ **Free & Offline**: No API keys required, runs locally
-
-## Example Queries (By Type)
-
-### 1. Hard Vehicle Filter (Exact Plate)
-Use this to find a specific car with 100% precision.
-- `"give me complete report for vehicle KA05XY9999"`
-- `"where was MH02AB1234 seen?"`
-
-### 2. Hard Camera Filter (Specific Cam)
-Use this to narrow down to specific hardware locations.
-- `"which vehicles passed through cam 3 today?"`
-- `"activity at cam 4 and cam 5 yesterday"`
-
-### 3. Hard Date Filter (Relative Time)
-Use this to strictly filter by time windows.
-- `"vehicles at warehouse today"`
-- `"any visitors yesterday"`
-- `"traffic day before yesterday"`
-
-### 4. Semantic Search (Concept Matching)
-Use this for abstract or fuzzy search terms.
-- `"Are there any cars moving in the middle of the night?"` (Matches 3 AM records)
-- `"suspicious activity near exit gate"` (Matches 'Exit Gate' location)
-- `"delivery trucks at dock"` (Matches 'Warehouse Dock' via semantic similarity)
-
-### 5. Hybrid (The Power User Query)
-Combines all above for ultimate precision.
-- `"show me movements for visitor KA01JJ8967 at cam 1 and cam 3 yesterday and today"`
+This generates a side-by-side comparison of **Cassandra Ground Truth (CQL)** vs **AI Results**, currently confirmed at **100% Match**.
 
 ## Technology Stack
 
 - **FastAPI**: Web framework
-- **SentenceTransformers**: Semantic embeddings (all-MiniLM-L6-v2)
-- **SQLite**: Database
-- **PyTorch**: ML backend
-
-## Next Steps
-
-To use with your real database:
-1. Update `setup_database.py` to connect to your actual database
-2. Modify the schema mapping in `api_server.py` (lines 117-137)
-3. Adjust `SIMILARITY_THRESHOLD` based on your data
-4. Deploy behind Nginx/Docker for production
+- **SentenceTransformers**: Embeddings via `all-MiniLM-L6-v2`
+- **Apache Cassandra**: NoSQL Database for scalable sightings storage
+- **PyTorch**: ML inference engine
 
 ## License
-
 MIT
