@@ -13,7 +13,7 @@ except ImportError:
     LANGCHAIN_AVAILABLE = False
 
 CASSANDRA_HOST = "127.0.0.1"
-CASSANDRA_KEYSPACE = "vehicle_analytics"
+CASSANDRA_KEYSPACE = "ilens_ladakh"
 
 def get_db_path():
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'vehicles.db')
@@ -43,12 +43,12 @@ def demo_ai_analytics(query_text):
     cluster = Cluster([CASSANDRA_HOST])
     session = cluster.connect(CASSANDRA_KEYSPACE)
     
-    results = session.execute("SELECT camera_id, location, timestamp, vehicle_number, snapshot_url FROM vehicle_sightings WHERE vehicle_number = %s", [vehicle_number])
+    results = session.execute("SELECT camera_id, camera_name, location, timestamp, vehicle_no, snapshotpath, videopath FROM vehicle_analysis_report WHERE vehicle_no = %s", [vehicle_number])
     
     processed_rows = []
     for r in results:
         if str(r.timestamp).startswith(date_filter):
-            processed_rows.append((r.camera_id, r.location, str(r.timestamp), r.vehicle_number, r.snapshot_url))
+            processed_rows.append((r.camera_id, r.camera_name, r.location, str(r.timestamp), r.vehicle_no, r.snapshotpath, r.videopath))
     
     cluster.shutdown()
 
@@ -58,13 +58,13 @@ def demo_ai_analytics(query_text):
 
     # Header
     report = f"\nREPORT FOR VEHICLE {vehicle_number} (FROM CASSANDRA)\n"
-    report += "-" * 80 + "\n"
-    report += f"{'Camera':<10} {'Location':<25} {'Timestamp':<20} {'Vehicle No.':<15} {'Snapshot'}\n"
-    report += "-" * 80 + "\n"
+    report += "-" * 110 + "\n"
+    report += f"{'Cam ID':<10} {'Cam Name':<15} {'Location':<25} {'Timestamp':<20} {'Vehicle No.':<15} {'Snapshot'}\n"
+    report += "-" * 110 + "\n"
 
     for row in processed_rows:
-        cam, loc, ts, veh, snap = row
-        report += f"{cam:<10} {loc:<25} {ts:<20} {veh:<15} {snap}\n"
+        cam_id, cam_name, loc, ts, veh, snap, vid = row
+        report += f"{cam_id:<10} {cam_name:<15} {loc:<25} {ts:<20} {veh:<15} {snap}\n"
     
     return report
 
@@ -104,5 +104,6 @@ def real_ai_analytics(query_text, api_key):
 
 
 if __name__ == "__main__":
-    test_query = "report for vehicle KA01JJ8967 movements yesterday"
+    yesterday_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+    test_query = f"report for vehicle TN09AB105 movements yesterday"
     print(demo_ai_analytics(test_query))

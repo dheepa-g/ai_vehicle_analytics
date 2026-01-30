@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     DB_TYPE: str = "cassandra"  # default to cassandra
     DB_NAME: str = "vehicles.db"
     CASSANDRA_HOST: str = "127.0.0.1"
-    CASSANDRA_KEYSPACE: str = "vehicle_analytics"
+    CASSANDRA_KEYSPACE: str = "ilens_ladakh"
     
     # Search Configuration
     DEFAULT_TOP_K: int = 5
@@ -70,18 +70,19 @@ class SearchRequest(BaseModel):
     threshold: Optional[float] = Field(settings.SIMILARITY_THRESHOLD, ge=0.0, le=1.0, description="Minimum similarity score")
 
 class VehicleRecord(BaseModel):
-    camera: str
+    camera_id: str
+    camera_name: Optional[str] = "N/A"
     location: str
     timestamp: str
-    vehicle_number: str
-    snapshot: str
+    vehicle_no: str
+    snapshotpath: str
+    videopath: Optional[str] = "N/A"
     score: Optional[float] = Field(None, description="Similarity score of the match")
 
 class SearchResponse(BaseModel):
     count: int
     query: str
     matches: List[VehicleRecord]
-    formatted_report: str
     execution_time_ms: float
 
 # --- Core Logic Engine ---
@@ -123,14 +124,14 @@ class AnalyticsEngine:
                 logger.info(f"Connecting to Cassandra at {settings.CASSANDRA_HOST}...")
                 cluster = Cluster([settings.CASSANDRA_HOST])
                 session = cluster.connect(settings.CASSANDRA_KEYSPACE)
-                rows = session.execute("SELECT camera_id, location, timestamp, vehicle_number, snapshot_url FROM vehicle_sightings")
+                rows = session.execute("SELECT camera_id, camera_name, location, timestamp, vehicle_no, snapshotpath, videopath FROM vehicle_analysis_report")
                 # Cassandra rows are slightly different in structure (named tuples)
                 # But we can iterate over them similarly
                 processed_rows = []
                 for row in rows:
                     # Standardize to second-precision for consistency across components
                     clean_ts = row.timestamp.strftime('%Y-%m-%d %H:%M:%S')
-                    processed_rows.append((row.camera_id, row.location, clean_ts, row.vehicle_number, row.snapshot_url))
+                    processed_rows.append((row.camera_id, row.camera_name, row.location, clean_ts, row.vehicle_no, row.snapshotpath, row.videopath))
                 rows = processed_rows
                 cluster.shutdown()
             else:
@@ -148,7 +149,7 @@ class AnalyticsEngine:
         unique_locs = set()
         
         for row in rows:
-            cam, loc, ts, veh, snap = row
+            cam, cam_name, loc, ts, veh, snap, vid = row
             unique_locs.add(loc)
             
             # Extract number from CAM_003 -> 3
@@ -163,11 +164,13 @@ class AnalyticsEngine:
             new_stored_data.append({
                 "text": text_desc,
                 "raw": {
-                    "camera": cam,
+                    "camera_id": cam,
+                    "camera_name": cam_name,
                     "location": loc,
                     "timestamp": ts,
-                    "vehicle_number": veh,
-                    "snapshot": snap
+                    "vehicle_no": veh,
+                    "snapshotpath": snap,
+                    "videopath": vid
                 }
             })
 
@@ -265,7 +268,7 @@ class AnalyticsEngine:
         found = set()
         
         # 1. Standard Plates
-        pattern = r"([A-Z]{2}[0-9]{2}[A-Z]{1,2}[0-9]{4})"
+        pattern = r"([A-Z]{2}[0-9]{2}[A-Z]{1,2}[0-9]{1,4})"
         matches = re.finditer(pattern, q)
         for match in matches:
             found.add(match.group(1))
@@ -361,7 +364,7 @@ class AnalyticsEngine:
                 # APPLY HARD FILTERS (Hybrid Logic Override)
                 
                 # Camera Filter
-                if requested_cams and record_data['camera'] not in requested_cams:
+                if requested_cams and record_data['camera_id'] not in requested_cams:
                     continue
                 
                 # Date Filter
@@ -371,7 +374,7 @@ class AnalyticsEngine:
                         continue
                 
                 # Vehicle Filter
-                if requested_vehicles and record_data['vehicle_number'] not in requested_vehicles:
+                if requested_vehicles and record_data['vehicle_no'] not in requested_vehicles:
                     continue
                     
                 # Location Filter
@@ -402,7 +405,7 @@ class AnalyticsEngine:
         for m in matches:
             score_pct = f"{int(m.score * 100)}%"
             report_lines.append(
-                f"{m.camera:<10} {m.location:<25} {m.timestamp:<20} {m.vehicle_number:<12} {score_pct:<8} {m.snapshot}"
+                f"{m.camera_id:<10} {m.location:<25} {m.timestamp:<20} {m.vehicle_no:<12} {score_pct:<8} {m.snapshotpath}"
             )
         return "\n".join(report_lines)
 
@@ -462,7 +465,7 @@ def perform_search(request: SearchRequest):
     matches = engine.search(request.query, request.top_k, request.threshold)
     
     # Format text report
-    report_text = engine.generate_report(matches, request.query)
+    # report_text = engine.generate_report(matches, request.query)
     
     execution_time = (time.time() - start_time) * 1000
     
@@ -470,7 +473,7 @@ def perform_search(request: SearchRequest):
         count=len(matches),
         query=request.query,
         matches=matches,
-        formatted_report=report_text,
+        # formatted_report=report_text,
         execution_time_ms=round(execution_time, 2)
     )
 

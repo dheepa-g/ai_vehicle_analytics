@@ -13,35 +13,32 @@ def setup_cassandra():
         print("    Ensure Cassandra is running (e.g., via Docker: docker run --name cassandra -p 9042:9042 -d cassandra)")
         sys.exit(1)
 
-    # 1. Create Keyspace
-    print("[+] Creating keyspace 'vehicle_analytics'...")
-    session.execute("""
-        CREATE KEYSPACE IF NOT EXISTS vehicle_analytics 
-        WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
-    """)
+
 
     # 2. Use Keyspace
-    session.set_keyspace('vehicle_analytics')
+    session.set_keyspace('ilens_ladakh')
 
     # 3. Create Table
-    # Partition Key: vehicle_number (for tracking specific vehicle movements)
+    # Partition Key: vehicle_no (for tracking specific vehicle movements)
     # Clustering Columns: timestamp (for time-ordered history)
-    print("[+] Creating table 'vehicle_sightings'...")
+    print("[+] Creating table 'vehicle_analysis_report'...")
     session.execute("""
-        CREATE TABLE IF NOT EXISTS vehicle_sightings (
-            vehicle_number text,
+        CREATE TABLE IF NOT EXISTS vehicle_analysis_report (
+            vehicle_no text,
             timestamp timestamp,
             camera_id text,
+            camera_name text,
             location text,
-            snapshot_url text,
-            PRIMARY KEY (vehicle_number, timestamp)
+            snapshotpath text,
+            videopath text,
+            PRIMARY KEY (vehicle_no, timestamp)
         ) WITH CLUSTERING ORDER BY (timestamp DESC);
     """)
 
     # 4. Create Secondary Indexes for non-partition queries
     print("[+] Creating indices for location and camera_id...")
-    session.execute("CREATE INDEX IF NOT EXISTS ON vehicle_sightings (location);")
-    session.execute("CREATE INDEX IF NOT EXISTS ON vehicle_sightings (camera_id);")
+    session.execute("CREATE INDEX IF NOT EXISTS ON vehicle_analysis_report (location);")
+    session.execute("CREATE INDEX IF NOT EXISTS ON vehicle_analysis_report (camera_id);")
 
     print("[+] Cassandra Setup Complete.")
     cluster.shutdown()

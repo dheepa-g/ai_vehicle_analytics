@@ -23,16 +23,16 @@ class LocalSearchEngine:
         self.index = None
         self.stored_data = []
 
-    def load_data_from_db(self, db_type="cassandra", host="127.0.0.1", keyspace="vehicle_analytics"):
+    def load_data_from_db(self, db_type="cassandra", host="127.0.0.1", keyspace="ilens_ladakh"):
         """Reads DB and converts rows to natural language 'documents'."""
         if db_type == "cassandra":
             from cassandra.cluster import Cluster
             cluster = Cluster([host])
             session = cluster.connect(keyspace)
-            rows = session.execute("SELECT camera_id, location, timestamp, vehicle_number, snapshot_url FROM vehicle_sightings")
+            rows = session.execute("SELECT camera_id, camera_name, location, timestamp, vehicle_no, snapshotpath, videopath FROM vehicle_analysis_report")
             processed_rows = []
             for row in rows:
-                processed_rows.append((row.camera_id, row.location, str(row.timestamp), row.vehicle_number, row.snapshot_url))
+                processed_rows.append((row.camera_id, row.camera_name, row.location, str(row.timestamp), row.vehicle_no, row.snapshotpath, row.videopath))
             rows = processed_rows
             cluster.shutdown()
         else:
@@ -47,9 +47,9 @@ class LocalSearchEngine:
         
         print(f"    Indexing {len(rows)} records from {db_type} database...")
         for row in rows:
-            cam, loc, ts, veh, snap = row
+            cam_id, cam_name, loc, ts, veh, snap, vid = row
             # Create a descriptive sentence for the model to "understand"
-            text_desc = f"Vehicle {veh} was seen at {loc} (Camera {cam}) on {ts}."
+            text_desc = f"Vehicle {veh} was seen at {loc} (Camera {cam_id}, {cam_name}) on {ts}."
             
             documents.append(text_desc)
             self.stored_data.append({
@@ -88,13 +88,13 @@ class LocalSearchEngine:
 
     def format_report_table(self, results):
         report = f"\nREPORT GENERATED FROM SEARCH MATCHES\n"
-        report += "-" * 90 + "\n"
-        report += f"{'Camera':<10} {'Location':<25} {'Timestamp':<20} {'Vehicle No.':<15} {'Snapshot'}\n"
-        report += "-" * 90 + "\n"
+        report += "-" * 110 + "\n"
+        report += f"{'Cam ID':<10} {'Cam Name':<15} {'Location':<25} {'Timestamp':<20} {'Vehicle No.':<15} {'Snapshot'}\n"
+        report += "-" * 110 + "\n"
 
         for item in results:
-            cam, loc, ts, veh, snap = item['raw']
-            report += f"{cam:<10} {loc:<25} {ts:<20} {veh:<15} {snap}\n"
+            cam_id, cam_name, loc, ts, veh, snap, vid = item['raw']
+            report += f"{cam_id:<10} {cam_name:<15} {loc:<25} {ts:<20} {veh:<15} {snap}\n"
         return report
 
 if __name__ == "__main__":
@@ -109,7 +109,7 @@ if __name__ == "__main__":
 
     # 2. Test Query
     # Note: We can ask vaguely now, no exact keyword matching needed
-    user_query = "Where was vehicle KA01JJ8967 seen lately?"
+    user_query = "Where was vehicle TN09AB105 seen lately?"
     
     if len(sys.argv) > 1:
         user_query = " ".join(sys.argv[1:])
